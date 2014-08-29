@@ -1,4 +1,4 @@
-reading-notes
+mongodb-notes
 =============
 
-读书笔记
+mongo干货，本人编写，整理的mongo使用经验
