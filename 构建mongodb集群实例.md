@@ -17,16 +17,13 @@ mkdir -p data/log/
 </pre>
 
 - 启动3个实例
-<pre>
->sudo ./mongod -replSet rs0 --fork --port 10001 --smallfiles --dbpath /home/dialog/data/data/node1 --logpath=/home/dialog/data/log/node1.log --logappend
 
+<pre>
+sudo ./mongod -replSet rs0 --fork --port 10001 --smallfiles --dbpath /home/dialog/data/data/node1 --logpath=/home/dialog/data/log/node1.log --logappend
 forked process: 635
 child process started successfully, parent exiting
-
->sudo ./mongod -replSet rs0 --fork --port 10002 --smallfiles --dbpath /home/dialog/data/data/node2 --logpath=/home/dialog/data/log/node2.log --logappend
-
->sudo ./mongod -replSet rs0 --fork --port 10003 --smallfiles --dbpath /home/dialog/data/data/node3 --logpath=/home/dialog/data/log/node3.log --logappend
-
+sudo ./mongod -replSet rs0 --fork --port 10002 --smallfiles --dbpath /home/dialog/data/data/node2 --logpath=/home/dialog/data/log/node2.log --logappend
+sudo ./mongod -replSet rs0 --fork --port 10003 --smallfiles --dbpath /home/dialog/data/data/node3 --logpath=/home/dialog/data/log/node3.log --logappend
 </pre>
 
 - 配置及初始化副本集
@@ -111,9 +108,11 @@ rs0:PRIMARY> rs.status()
         ],
         "ok" : 1
 }
+</pre>
 
 调用isMaster()方法查看副本集状态
 
+<pre>
 rs0:PRIMARY> rs.isMaster()
 {
         "setName" : "rs0",
@@ -135,10 +134,11 @@ rs0:PRIMARY> rs.isMaster()
         "minWireVersion" : 0,
         "ok" : 1
 }
-
+</pre>
 
 也可以从从节点查询副本集的状态。
 
+<pre>
 sudo mongo --port 10002
 MongoDB shell version: 2.6.4
 connecting to: 127.0.0.1:10002/test
@@ -192,7 +192,6 @@ rs0:SECONDARY> rs.status()
         ],
         "ok" : 1
 }
-
 </pre>
 
 - over，至此，已经在当台机器上，部署完成了三个mongodb数据库实例。
