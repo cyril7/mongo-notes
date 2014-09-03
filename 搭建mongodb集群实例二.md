@@ -47,7 +47,7 @@ sudo ./mongod -replSet loggod --fork --port 10003 --smallfiles --dbpath /data/da
  sudo ./mongo --port 10001
 MongoDB shell version: 2.6.3
 connecting to: 127.0.0.1:10001/test
-> rs.initiate()//初始化
+rs.initiate()//初始化
 {
         "info2" : "no configuration explicitly specified -- making one",
         "me" : "ubuntu-dialog:10001",
@@ -142,7 +142,6 @@ loggod:PRIMARY> rs.status()//当前状态
         ],
         "ok" : 1
 }
-loggod:PRIMARY> 
 </pre>
 
 - 将站点B的node3的优先级设置为0，即该节点只作为备份节点使用，不作为主节点使用
