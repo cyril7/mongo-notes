@@ -91,7 +91,8 @@ loggod:PRIMARY> rs.add("ubuntu-dialog:10002")//增加站点A的node2
 { "ok" : 1 }
 loggod:PRIMARY> rs.add("ubuntu-12:10003")//增加站点B的node3
 { "ok" : 1 }
-
+</pre>
+<pre>
 loggod:PRIMARY> rs.status()//当前状态
 {
         "set" : "loggod",
