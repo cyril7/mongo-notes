@@ -602,11 +602,194 @@ loggod:SECONDARY> rs.status()
 }
 loggod:SECONDARY> 
 
+</pre>
+
+###将从节点优先级设置为0，该节点将不作为主节点的备选
+
+###隐节点
+
+隐节点的优先级为0，具有选举权，对应用不可见。隐节点通常作为延迟节点使用。
+
+###延迟节点
+
+延迟节点配置如下
+
+<pre>
+cfg=rs.conf()
+cfg.members[0].priority=0
+cfg.members[0].hidden=true
+cfg.members[0].slaveDelay=3600//单位是s，设置1小时的延迟
+</pre>
+
+slaveDelay值为1小时，即数据同步和oplog都有一个小时的延迟
+
+##集群维护
+
+###设置oplog的大小
+
+oplog是一个固定大小的集合。根据实际需求，可能需要调大或调小大小。例如，在短期能有大量数据的插入，更新或删除，则需要增大oplog的大小。
+
+经验
+>遇到需要暂停集群的操作，先停止从节点，再停止主节点。
+
+- 将集群中的一个从节点关闭，并在新的端口以实例的方式运行
+
+<pre>
+sudo ./mongo --port 10004
+MongoDB shell version: 2.6.3
+connecting to: 127.0.0.1:10004/test
+loggod:SECONDARY> rs.conf()
+{
+        "_id" : "loggod",
+        "version" : 7,
+        "members" : [
+                {
+                        "_id" : 0,
+                        "host" : "ubuntu-dialog:10001"
+                },
+                {
+                        "_id" : 1,
+                        "host" : "ubuntu-dialog:10002",
+                        "priority" : 2
+                },
+                {
+                        "_id" : 2,
+                        "host" : "ubuntu-12:10003",
+                        "priority" : 0
+                },
+                {
+                        "_id" : 3,
+                        "host" : "ubuntu-dialog:10004",
+                        "priority" : 0.5
+                },
+                {
+                        "_id" : 4,
+                        "host" : "ubuntu-dialog:10005",
+                        "arbiterOnly" : true
+                }
+        ]
+}
+loggod:SECONDARY> db.shutdownServer()
+shutdown command only works with the admin database; try 'use admin'
+loggod:SECONDARY> use admin
+switched to db admin
+loggod:SECONDARY> db.shutdownServer()
+2014-09-03T13:12:39.239+0800 DBClientCursor::init call() failed
+server should be down...
+2014-09-03T13:12:39.241+0800 trying reconnect to 127.0.0.1:10004 (127.0.0.1) failed
+2014-09-03T13:12:39.241+0800 reconnect 127.0.0.1:10004 (127.0.0.1) ok
+2014-09-03T13:12:39.242+0800 Socket recv() errno:104 Connection reset by peer 127.0.0.1:10004
+2014-09-03T13:12:39.242+0800 SocketException: remote: 127.0.0.1:10004 error: 9001 socket exception [RECV_ERROR] server [127.0.0.1:10004] 
+2014-09-03T13:12:39.242+0800 DBClientCursor::init call() failed
+2014-09-03T13:12:39.245+0800 trying reconnect to 127.0.0.1:10004 (127.0.0.1) failed
+2014-09-03T13:12:39.245+0800 warning: Failed to connect to 127.0.0.1:10004, reason: errno:111 Connection refused
+2014-09-03T13:12:39.245+0800 reconnect 127.0.0.1:10004 (127.0.0.1) failed failed couldn't connect to server 127.0.0.1:10004 (127.0.0.1), connection attempt failed
+> 
+
+//还是在原先的数据目录上，换个端口，启动数据实例
+sudo ./mongod --port 10006 --smallfiles --dbp
+ath /data/data/node4 --logpath /data/log/node4.log --logappend --fork
+about to fork child process, waiting until server is ready for connections.
+forked process: 32390
+child process started successfully, parent exiting
 
 </pre>
 
+- 由于要操作oplog.rs，可以先将其备份，保险起见
+
+<pre>
+sudo ./mongodump --db local --collection 'oplog.rs' --port 10006
+connected to: 127.0.0.1:10006
+2014-09-03T13:16:20.562+0800 DATABASE: local     to     dump/local
+2014-09-03T13:16:20.562+0800    local.oplog.rs to dump/local/oplog.rs.bson
+2014-09-03T13:16:20.563+0800             3 documents
+2014-09-03T13:16:20.563+0800    Metadata for local.oplog.rs to dump/local/oplog.rs.metadata.json
+</pre>
+
+- 重建oplog数据集，保留原先oplog的最后一条记录
+
+<pre>
+ sudo ./mongo --port 10006
+MongoDB shell version: 2.6.3
+connecting to: 127.0.0.1:10006/test
+Server has startup warnings: 
+2014-09-03T13:14:06.295+0800 [initandlisten] 
+2014-09-03T13:14:06.295+0800 [initandlisten] ** WARNING: mongod started without --replSet yet 1 documents are present in local.system.replset
+2014-09-03T13:14:06.295+0800 [initandlisten] **          Restart with --replSet unless you are doing maintenance and no other clients are connected.
+2014-09-03T13:14:06.295+0800 [initandlisten] **          The TTL collection monitor will not start because of this.
+2014-09-03T13:14:06.295+0800 [initandlisten] **          For more info see http://dochub.mongodb.org/core/ttlcollections
+2014-09-03T13:14:06.295+0800 [initandlisten] 
+> use local
+switched to db local
+> db=db.getSiblingDB('local')
+local
+> show collections
+me
+oplog.rs
+replset.minvalid
+startup_log
+system.indexes
+system.replset
+> db.temp.find()
+> db.temp.drop()
+false
+> db.temp.save(db.oplog.rs.find({},{ts:1,h:1}).sort({$natural:-1}).limit(1).next())//选择原先oplog中的最后一条记录
+WriteResult({ "nInserted" : 1 })
+> db.temp.find()
+{ "_id" : ObjectId("5406a4eb750a99c044b1b8d7"), "ts" : Timestamp(1409652628, 1), "h" : NumberLong("4616853469403723580") }
+
+</pre>
+
+- 删除原先的oplog集合
+
+<pre>
+> db=db.getSiblingDB('local')
+local
+> db.oplog.rs.drop()
+true
+</pre>
+
+- 创建新的oplog
+
+<pre>
+> db.runCommand({create:"oplog.rs",capped:true,size:(2*1024*1024*1024)})
+{ "ok" : 1 }
+</pre>
+
+- 将最后一条oplog记录插入新的oplog中
+
+<pre>
+> db.oplog.rs.save(db.temp.findOne())
+WriteResult({
+        "nMatched" : 0,
+        "nUpserted" : 1,
+        "nModified" : 0,
+        "_id" : ObjectId("5406a4eb750a99c044b1b8d7")
+})
+</pre>
 
 
+- 删除temp集合
+
+<pre>
+db.temp.drop()
+</pre>
+
+- 关闭，并重新启动成员
+
+<pre>
+> db.shutdownServer()
+shutdown command only works with the admin database; try 'use admin'
+> use admin
+switched to db admin
+> db.shutdownServer()
+2014-09-03T13:22:08.346+0800 DBClientCursor::init call() failed
+server should be down...
+2014-09-03T13:22:08.348+0800 trying reconnect to 127.0.0.1:10006 (127.0.0.1) failed
+2014-09-03T13:22:08.348+0800 warning: Failed to connect to 127.0.0.1:10006, reason: errno:111 Connection refused
+2014-09-03T13:22:08.348+0800 reconnect 127.0.0.1:10006 (127.0.0.1) failed failed couldn't connect to server 127.0.0.1:10006 (127.0.0.1), connection attempt failed
+</pre>
 
 
+**ps.改变主节点的oplog大小的步骤与从节点的步骤基本相同，不过暂停主节点要使用rs.stepDown()**
 
